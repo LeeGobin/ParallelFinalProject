@@ -1,0 +1,121 @@
+#include <stdio.h> 
+#include <stdlib.h> 
+#include <mpi.h>
+
+//Function Declaration
+int* mergeSort(int height, int rank, int smallArray[], int size, MPI_Comm comm, int bigArray[]);
+void printArray(int nums[], int size);
+
+
+//Main Function
+int main(int argc, char **argv)
+{
+    //Usual MPI init
+    MPI_Init(&argc,&argv);
+    int rank, numranks;
+    MPI_Comm_size(MPI_COMM_WORLD, &numranks);
+    MPI_Comm_rank(MPI_COMM_WORLD, &rank);
+    MPI_Status stat;
+
+    //Variables
+    int numbers[]={34,65,74,1,67,26,34,66,78,54,34,23};
+    int numbers_size=sizeof(numbers)/sizeof(numbers[0]);
+    int bigArraySize;
+    int smallArraySize;
+    int *bigArray, *smallArray;
+
+    //get size of array
+    getSize(argc, argv, rank, numranks, &bigArraySize);
+
+    //Determine heigh of tree
+    height = log2(numranks);
+
+    //fill OG array with values in rank 0
+    if(rank ==0)
+    {
+        bigArray = (int*) malloc(bigArraySize*sizeof(int));
+        populateArray(bigArray,bigArraySize, rank);
+    }
+
+    smallArraySize = bigArraySize/numranks;
+    smallArray = (int*) malloc(smallArraySize*sizeof(int));
+
+    //Scatter smallArrays to nodes
+    MPI_Scatter(bigArray, smallArraySize, MPI_INT, smallArray, smallArraySize, MPI_INT, 0,MPI_COMM_WORLD);
+
+    //Merge
+    if(rank==0)
+    {
+        bigArray = mergeSort(height, rank, smallArray, smallArraySize, MPI_COMM_WORLD, bigArray);
+    }
+    else
+    {
+        mergeSort(height, rank, smallArray, smallArraySize, MPI_COMM_WORLD, NULL);
+    }
+
+    free(smallArray);
+    MPI_Finalize();
+    
+}
+
+int* mergeSort(int height, int rank, int smallArray[], int size, MPI_Comm comm, int bigArray[])
+{
+    int parent;
+    int child;
+    myHeight;
+    qsort(localArray, size, sizeof(int), compare);
+    left=smallArray;
+
+    while(myHeight < height)
+    {
+        parent = (rank & (~(1<< myHeight)));
+
+        if(parent==rank)
+        {
+            child=(rank|(1<<myHeight));
+
+            right = (int*)malloc(size*sizeof(int));
+            MPI_Recv(right, size, MPI_INT, child, 0,MPI_COMM_WORLD,MPI_STATUS_IGNORE);
+
+            //allocate memory for merge 
+            mergeResult =(int*)malloc(size*2*sizeof(int));
+
+            mergeResult = merge(left,right,mergeResult,size);
+
+            left = mergeResult;
+
+            size=size*2;
+
+            free(right);
+            mergeResult=NULL;
+            myHeight++;
+
+        }
+        else
+        {
+            MPI_Send(left, size, MPI_INT, parent, 0,MPI_COMM_WORLD);
+            if(myHeight!=0)
+            {
+                free(left);
+            }
+            myHeight=height;
+        }
+        
+        
+    }
+    if(rank==0)
+    {
+        bigArray=left;
+    }
+
+    return bigArray;
+}
+
+void printArray(int nums[], int size)
+{
+    for(int i=0;i<size;i++)
+    {
+        printf("%d ", nums[i]);
+        printf("\n");
+    }
+}
